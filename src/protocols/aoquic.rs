@@ -1,117 +1,120 @@
-//! This module implements the Adaptive Obfuscated QUIC (AOQUIC) protocol.
-//! It aims to provide fast and highly resistant tunneling over UDP.
+// src/protocols/aoquic.rs
+//! Implements the Adaptive Obfuscated QUIC (AOQUIC) protocol.
 
-use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
-    net::UdpSocket,
-};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-    io::{self, ErrorKind},
-    net::SocketAddr,
-};
-use quinn::{Endpoint, Connection};
+use async_trait::async_trait;
+use tokio::net::{TcpStream, UdpSocket, SocketAddr};
+use std::io;
+use tracing::{info, debug, error, warn}; // Import tracing macros
 
-/// `AoQuicStream` represents a QUIC stream that uses adaptive obfuscation.
-pub struct AoQuicStream {
-    connection: Connection,
-    // For simplicity, we'll expose a single stream for read/write for now.
-    // In a real scenario, QUIC allows multiple streams.
-    // We'll manage stream creation/acceptance internally.
-    #[allow(dead_code)] // Will be used later
-    _stream_id: u64, // Placeholder for the actual stream we're using
+use crate::protocols::ObfuscatedProtocol; // Import the trait
+
+/// Represents the AOQUIC obfuscated protocol.
+/// This struct will hold configuration and state specific to AOQUIC.
+#[derive(Clone)] // Required for .clone() in main.rs
+pub struct AoQuicProtocol {
+    // TODO: Add fields for QUIC configuration, obfuscation keys, etc.
 }
 
-impl AoQuicStream {
-    /// Establishes an `AoQuicStream` connection to the specified server address.
-    /// `remote_addr` is the target server's address (e.g., "127.0.0.1:4433").
-    pub async fn connect(remote_addr: &str) -> io::Result<Self> {
-        let remote_addr: SocketAddr = remote_addr
-            .parse()
-            .map_err(|e| io::Error::new(ErrorKind::InvalidInput, format!("Invalid address: {}", e)))?;
-
-        // TODO: In a real implementation, we would configure QUIC encryption,
-        // certificate validation, and most importantly, our custom obfuscation layers
-        // at the `Endpoint` and `Connection` level. This is where "Adaptive Obfuscation" comes in.
-
-        // Dummy configuration for now to get it to compile (will be replaced)
-        let mut client_config = quinn::ClientConfigBuilder::default();
-        // This is crucial for initial obfuscation: we would generate/load a dummy cert
-        // or use specific settings to mimic legitimate QUIC traffic.
-        // For now, we'll allow an insecure connection for testing, but this MUST be changed for production.
-        client_config.dangerous().skip_certificate_verification(true); 
-        let client_config = client_config.build();
-
-        // Create a UDP socket for the client
-        let socket = UdpSocket::bind("0.0.0.0:0") // Bind to an ephemeral port
-            .await?;
-
-        // Create a QUIC endpoint
-        let mut endpoint = Endpoint::builder();
-        endpoint.default_client_config(client_config);
-        let (endpoint, _incoming) = endpoint.with_socket(socket)?;
-
-        println!("AOQUIC: Attempting to connect to {}", remote_addr);
-
-        // Connect to the remote server, specify a server name for TLS
-        let connection = endpoint.connect(remote_addr, "hezardastan.example.com") // Target server name (for TLS)
-            .map_err(|e| io::Error::new(ErrorKind::Other, format!("Failed to connect to QUIC endpoint: {}", e)))?
-            .await
-            .map_err(|e| io::Error::new(ErrorKind::Other, format!("QUIC handshake failed: {}", e)))?;
-
-        println!("AOQUIC: QUIC connection established.");
-
-        // Open a bidirectional stream for data transfer
-        let (send_stream, recv_stream) = connection.open_bi()
-            .await
-            .map_err(|e| io::Error::new(ErrorKind::Other, format!("Failed to open QUIC stream: {}", e)))?;
-
-        // TODO: Manage multiple streams and apply obfuscation/de-obfuscation at the stream level
-        // For now, we'll wrap the send/recv parts into a single logical stream for simpler `AsyncRead`/`AsyncWrite` implementation.
-        Ok(Self {
-            connection,
-            _stream_id: send_stream.id(), // Storing dummy stream id
-        })
+impl AoQuicProtocol {
+    /// Creates a new instance of the AoQuicProtocol.
+    pub fn new() -> Self {
+        info!("Initializing AOQUIC Protocol.");
+        AoQuicProtocol {
+            // Initialize fields here
+        }
     }
 }
 
-// NOTE: Implementing AsyncRead/AsyncWrite for QUIC streams is more complex
-// than for WebSockets because QUIC itself manages streams.
-// This is a simplified representation and will need significant refinement.
-// For now, we'll use placeholder implementations.
+#[async_trait]
+impl ObfuscatedProtocol for AoQuicProtocol {
+    fn name(&self) -> &'static str {
+        "AOQUIC"
+    }
 
-impl AsyncRead for AoQuicStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        // TODO: Read from the underlying QUIC stream and apply de-obfuscation
-        // This will involve managing one or more quinn::RecvStream objects.
-        Poll::Pending // Placeholder
+    // AOQUIC is a UDP-based protocol, so this method will likely not be used,
+    // or it might log an error if called.
+    async fn handle_tcp_stream(&self, stream: TcpStream) -> io::Result<()> {
+        let peer_addr = stream.peer_addr()?;
+        error!("AOQUIC: Received unexpected TCP stream from {}. This protocol is UDP-based.", peer_addr);
+        Err(io::Error::new(io::ErrorKind::Other, "AOQUIC does not handle TCP streams."))
+    }
+
+    async fn handle_udp_packet(&self, socket: &UdpSocket, buf: &[u8], peer_addr: SocketAddr) -> io::Result<()> {
+        debug!("AOQUIC: Handling incoming UDP packet from {} ({} bytes)", peer_addr, buf.len());
+
+        // TODO: Here's where the actual QUIC packet processing and obfuscation/de-obfuscation logic will go.
+        // This will involve:
+        // 1. De-obfuscating the packet.
+        // 2. Processing it as a QUIC packet (e.g., establishing connection, handling streams).
+        // 3. Forwarding data through the QUIC connection.
+
+        // For now, we'll just simulate processing and potentially echo back (for testing).
+        // In a real scenario, you wouldn't necessarily echo back raw packets.
+
+        // Example: Simple echo for demonstration (REMOVE IN REAL IMPLEMENTATION)
+        // if let Err(e) = socket.send_to(buf, peer_addr).await {
+        //     warn!("AOQUIC: Failed to echo UDP packet back to {}: {}", peer_addr, e);
+        // }
+
+        info!("AOQUIC: Successfully processed simulated UDP packet from {}", peer_addr);
+        Ok(())
     }
 }
 
-impl AsyncWrite for AoQuicStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        // TODO: Write to the underlying QUIC stream and apply obfuscation
-        // This will involve managing one or more quinn::SendStream objects.
-        Poll::Pending // Placeholder
+// Add unit tests for this module
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::UdpSocket;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn test_aoquic_protocol_name() {
+        let protocol = AoQuicProtocol::new();
+        assert_eq!(protocol.name(), "AOQUIC");
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        // TODO: Flush the QUIC stream
-        Poll::Ready(Ok(())) // Placeholder
+    #[tokio::test]
+    async fn test_aoquic_handles_udp_packet_successfully() {
+        let protocol = AoQuicProtocol::new();
+        let listener_socket = UdpSocket::bind("127.0.0.1:0").await.unwrap(); // Bind to ephemeral port
+        let addr = listener_socket.local_addr().unwrap();
+
+        // Spawn a task to simulate receiving and handling a packet
+        let listener_socket_clone = listener_socket.try_clone().unwrap();
+        tokio::spawn(async move {
+            let mut buf = vec![0u8; 1024];
+            let (len, peer_addr) = listener_socket_clone.recv_from(&mut buf).await.unwrap();
+            let received_data = buf[..len].to_vec();
+            // Simulate protocol handling
+            let _ = protocol.handle_udp_packet(&listener_socket_clone, &received_data, peer_addr).await;
+        });
+
+        // Send a dummy UDP packet from a "client"
+        let client_socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let test_data = b"hello aoquic";
+        let send_result = client_socket.send_to(test_data, addr).await;
+        assert!(send_result.is_ok()); // Ensure client can send
+
+        // Give some time for the spawned task to process
+        tokio::time::sleep(Duration::from_millis(10)).await;
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        // TODO: Gracefully close the QUIC connection/stream
-        self.connection.close(0u32.into(), b"shutdown");
-        Poll::Ready(Ok(())) // Placeholder
+    #[tokio::test]
+    async fn test_aoquic_rejects_tcp_streams() {
+        let protocol = AoQuicProtocol::new();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap(); // Dummy listener
+        let addr = listener.local_addr().unwrap();
+
+        // Connect a dummy client
+        let client_stream_result = TcpStream::connect(addr).await;
+        assert!(client_stream_result.is_ok());
+        let client_stream = client_stream_result.unwrap();
+
+        let result = protocol.handle_tcp_stream(client_stream).await;
+
+        // Assert that it returns an error because AOQUIC is UDP-based
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Other);
     }
 }
