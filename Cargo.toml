@@ -2,16 +2,19 @@
 name = "hezardastan-core"
 version = "0.1.0"
 edition = "2021"
-authors = ["Anonymous Contributor <core.anon@example.com>"] # اینجا همون ایمیل و اسم ناشناس رو میذاریم
+authors = ["Anonymous Contributor <core.anon@example.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1", features = ["full"] } # برای async runtime و امکانات شبکه
-tokio-tungstenite = { version = "0.21", features = ["native-tls"] } # برای WebSocket
-url = "2.5" # برای تجزیه و تحلیل URL
-futures-util = "0.3" # ابزارهای کمکی برای Futures
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+url = "2.5"
+futures-util = "0.3"
 
 # Dependencies for QUIC protocol (AOQUIC)
-quinn = "0.10" # کتابخانه اصلی برای QUIC
-rcgen = "0.12" # برای تولید گواهی‌های TLS (مورد نیاز برای QUIC)
+quinn = "0.10"
+rcgen = "0.12"
+
+# Dependency for random number generation in obfuscation
+rand = "0.8" # برای تولید اعداد تصادفی
