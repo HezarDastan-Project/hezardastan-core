@@ -2,7 +2,7 @@
 name = "hezardastan-core"
 version = "0.1.0"
 edition = "2021"
-authors = ["SilentOrchid <hezardastan.project@protonmail.com>"] # 
+authors = ["Anonymous Contributor <core.anon@example.com>"] # اینجا همون ایمیل و اسم ناشناس رو میذاریم
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,3 +11,7 @@ tokio = { version = "1", features = ["full"] } # برای async runtime و ام�
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] } # برای WebSocket
 url = "2.5" # برای تجزیه و تحلیل URL
 futures-util = "0.3" # ابزارهای کمکی برای Futures
+
+# Dependencies for QUIC protocol (AOQUIC)
+quinn = "0.10" # کتابخانه اصلی برای QUIC
+rcgen = "0.12" # برای تولید گواهی‌های TLS (مورد نیاز برای QUIC)
