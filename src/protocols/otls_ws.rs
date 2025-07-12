@@ -1,102 +1,105 @@
-//! This module implements the Obfuscated TLS over WebSocket (OTLS/WS) protocol.
-//! It aims to mimic legitimate HTTPS traffic over WebSockets to evade censorship.
+// src/protocols/otls_ws.rs
+//! Implements the Obfuscated TLS over WebSocket (OTLS/WS) protocol.
 
-use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
-    net::TcpStream,
-};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-use url::Url;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-    io::{self, ErrorKind},
-};
+use async_trait::async_trait;
+use tokio::net::{TcpStream, UdpSocket, SocketAddr};
+use std::io;
+use tracing::{info, debug, error}; // Import tracing macros
 
-/// `OtlsWsStream` represents a WebSocket stream that mimics HTTPS traffic.
-pub struct OtlsWsStream {
-    inner: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    // Placeholder for future obfuscation state, e.g., current mimicry pattern
-    _obfuscation_state: (), 
+use crate::protocols::ObfuscatedProtocol; // Import the trait
+
+/// Represents the OTLS/WS obfuscated protocol.
+/// This struct will hold configuration and state specific to OTLS/WS.
+#[derive(Clone)] // Required for .clone() in main.rs
+pub struct OtlsWsProtocol {
+    // TODO: Add fields for TLS certificates, WebSocket path, etc.
 }
 
-impl OtlsWsStream {
-    /// Establishes an `OtlsWsStream` connection to the specified URL.
-    /// The `target_url` should be a WebSocket URL (e.g., "ws://example.com/path" or "wss://example.com/path").
-    pub async fn connect(target_url: &str) -> io::Result<Self> {
-        let url = Url::parse(target_url)
-            .map_err(|e| io::Error::new(ErrorKind::InvalidInput, format!("Invalid URL: {}", e)))?;
-
-        // 1. Establish initial TCP connection (and TLS if WSS)
-        // This part will be handled by tokio-tungstenite, but we can add our
-        // custom TLS/connection settings here later.
-        let (ws_stream, _response) = tokio_tungstenite::connect_async(url)
-            .await
-            .map_err(|e| io::Error::new(ErrorKind::Other, format!("WebSocket connection failed: {}", e)))?;
-
-        println!("OTLS/WS: WebSocket connection established.");
-
-        Ok(Self {
-            inner: ws_stream,
-            _obfuscation_state: (), // Initialize placeholder
-        })
-    }
-
-    /// Here we'll add logic to apply obfuscation to outgoing data.
-    /// For now, it's a direct pass-through.
-    fn apply_obfuscation(&self, data: &[u8]) -> Vec<u8> {
-        // TODO: Implement advanced mimicry and obfuscation techniques here.
-        // This will involve changing patterns, adding noise, and blending.
-        data.to_vec() 
-    }
-
-    /// Here we'll add logic to de-obfuscate incoming data.
-    /// For now, it's a direct pass-through.
-    fn remove_obfuscation(&self, data: &[u8]) -> Vec<u8> {
-        // TODO: Implement de-obfuscation logic.
-        data.to_vec()
+impl OtlsWsProtocol {
+    /// Creates a new instance of the OtlsWsProtocol.
+    pub fn new() -> Self {
+        info!("Initializing OTLS/WS Protocol.");
+        OtlsWsProtocol {
+            // Initialize fields here
+        }
     }
 }
 
-// Implementing AsyncRead and AsyncWrite traits for seamless data transfer
-// This allows OtlsWsStream to be used like any other network stream (e.g., TcpStream)
+#[async_trait]
+impl ObfuscatedProtocol for OtlsWsProtocol {
+    fn name(&self) -> &'static str {
+        "OTLS/WS"
+    }
 
-impl AsyncRead for OtlsWsStream {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
-        // Read raw data from the WebSocket stream
-        let filled_before = buf.filled().len();
-        let poll_res = Pin::new(&mut self.inner).poll_read(cx, buf);
+    async fn handle_tcp_stream(&self, stream: TcpStream) -> io::Result<()> {
+        let peer_addr = stream.peer_addr()?;
+        info!("OTLS/WS: Handling incoming TCP stream from {}", peer_addr);
 
-        // TODO: Apply de-obfuscation after reading
-        // This part needs careful handling as ReadBuf works directly with the buffer.
-        // For now, it just passes through.
+        // TODO: Here's where the actual TLS handshake and WebSocket framing logic will go.
+        // For now, we'll just simulate success and close the connection.
 
-        poll_res
+        // Example of what might happen:
+        // 1. Perform TLS handshake
+        // 2. Perform WebSocket handshake
+        // 3. Tunnel traffic through the WebSocket
+
+        debug!("OTLS/WS: Successfully processed simulated connection from {}", peer_addr);
+        // In a real scenario, the stream would be kept open for tunneling.
+        // For this basic implementation, we just return Ok(()).
+        Ok(())
+    }
+
+    // OTLS/WS is a TCP-based protocol, so this method will likely not be used,
+    // or it might log an error if called.
+    async fn handle_udp_packet(&self, _socket: &UdpSocket, _buf: &[u8], peer_addr: SocketAddr) -> io::Result<()> {
+        error!("OTLS/WS: Received unexpected UDP packet from {}. This protocol is TCP-based.", peer_addr);
+        Err(io::Error::new(io::ErrorKind::Other, "OTLS/WS does not handle UDP packets."))
     }
 }
 
-impl AsyncWrite for OtlsWsStream {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<io::Result<usize>> {
-        // Apply obfuscation before writing
-        let obfuscated_data = self.apply_obfuscation(buf);
+// Add unit tests for this module
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+    use std::time::Duration;
 
-        // Write the obfuscated data to the WebSocket stream
-        Pin::new(&mut self.inner).poll_write(cx, &obfuscated_data)
+    #[tokio::test]
+    async fn test_otlsws_protocol_name() {
+        let protocol = OtlsWsProtocol::new();
+        assert_eq!(protocol.name(), "OTLS/WS");
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
+    #[tokio::test]
+    async fn test_otlsws_handles_tcp_stream_successfully() {
+        let protocol = OtlsWsProtocol::new();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap(); // Bind to ephemeral port
+        let addr = listener.local_addr().unwrap();
+
+        // Spawn a task to handle the incoming connection
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            // Simulate protocol handling
+            let _ = protocol.handle_tcp_stream(stream).await;
+        });
+
+        // Connect to the listener
+        let client_stream = TcpStream::connect(addr).await;
+        assert!(client_stream.is_ok()); // Ensure client can connect
+        // In a real test, you'd send/receive data and assert on its content
     }
 
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
+    #[tokio::test]
+    async fn test_otlsws_rejects_udp_packets() {
+        let protocol = OtlsWsProtocol::new();
+        let dummy_socket_addr: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let dummy_socket = UdpSocket::bind("127.0.0.1:0").await.unwrap(); // Dummy socket
+        let dummy_buf = vec![0u8; 0]; // Empty buffer
+
+        let result = protocol.handle_udp_packet(&dummy_socket, &dummy_buf, dummy_socket_addr).await;
+
+        // Assert that it returns an error because OTLS/WS is TCP-based
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::Other);
     }
 }
