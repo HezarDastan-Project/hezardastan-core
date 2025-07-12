@@ -1,0 +1,13 @@
+[package]
+name = "hezardastan-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["SilentOrchid <hezardastan.project@protonmail.com>"] # 
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["full"] } # برای async runtime و امکانات شبکه
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] } # برای WebSocket
+url = "2.5" # برای تجزیه و تحلیل URL
+futures-util = "0.3" # ابزارهای کمکی برای Futures
