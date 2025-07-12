@@ -18,3 +18,8 @@ rcgen = "0.12"
 
 # Dependency for random number generation in obfuscation
 rand = "0.8" # برای تولید اعداد تصادفی
+
+# ... سایر وابستگی‌ها
+# For structured logging and tracing
+tracing = "0.1"
+tracing-subscriber = "0.3"
